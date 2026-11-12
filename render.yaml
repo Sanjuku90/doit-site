@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: do-it-web
+    runtime: python
+    plan: 0.5c-512mb
+    buildCommand: python -m compileall -q server.py
+    startCommand: python server.py
+    healthCheckPath: /api/health
+    disk:
+      name: doit-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DOIT_HOST
+        value: 0.0.0.0
+      - key: DOIT_DB
+        value: /var/data/doit.sqlite3
+      - key: DOIT_SECURE_COOKIE
+        value: "1"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: DOIT_MANUAL_TEST
+        value: "1"
+      - key: DOIT_ADMIN_EMAIL
+        sync: false
+      - key: DOIT_ADMIN_REVIEW_SECRET
+        generateValue: true
+      - key: DOIT_ADMIN_BOOTSTRAP_PASSWORD
+        sync: false
