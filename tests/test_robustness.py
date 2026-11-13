@@ -4,7 +4,7 @@ from finance import ledger,web_queue
 class RobustnessTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
-  cls.tmp=tempfile.TemporaryDirectory();server.DB=pathlib.Path(cls.tmp.name)/'test.db';server.init();server.MANUAL_TEST=True;server.ADMIN_EMAIL='admin@tests.invalid';server.ADMIN_SECRET='u'*40;server.RATE.clear();cls.http=server.ThreadingHTTPServer(('127.0.0.1',0),server.Handler);cls.t=threading.Thread(target=cls.http.serve_forever,daemon=True);cls.t.start();cls.url='http://127.0.0.1:'+str(cls.http.server_port)
+  cls.tmp=tempfile.TemporaryDirectory();server.DB=pathlib.Path(cls.tmp.name)/'test.db';server.init();server.MANUAL_TEST=True;server.WITHDRAW_FEE_PERCENT='2.5';server.ADMIN_EMAIL='admin@tests.invalid';server.ADMIN_SECRET='u'*40;server.RATE.clear();cls.http=server.ThreadingHTTPServer(('127.0.0.1',0),server.Handler);cls.t=threading.Thread(target=cls.http.serve_forever,daemon=True);cls.t.start();cls.url='http://127.0.0.1:'+str(cls.http.server_port)
  @classmethod
  def tearDownClass(cls):cls.http.shutdown();cls.http.server_close();cls.tmp.cleanup();server.MANUAL_TEST=False;server.ADMIN_EMAIL='';server.ADMIN_SECRET='';server.RATE.clear()
  def request(self,op,path,data=None,csrf=None):
@@ -28,7 +28,7 @@ class RobustnessTests(unittest.TestCase):
    status,_=self.request(op,'/api/manual/deposit',{'usd':v,'usdt':'1','txid':'a'*64},me['csrf']);self.assertEqual(status,400)
  def test_reserved_double_request_and_dashboard(self):
   op,me=self.new_user('withdraw@tests.invalid');ledger.book_verified_deposit(server.DB,me['id'],10000,'simulated')
-  payload={'usd':'70.00','address':web_queue.ADDRESS}
+  payload={'usd':'70.00','address':web_queue.ADDRESS,'accepted_fee_bps':250,'accepted_fee_cents':175}
   def send(_):return self.request(op,'/api/manual/withdraw',payload,me['csrf'])[0]
   with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:codes=list(pool.map(send,range(2)))
   self.assertEqual(sorted(codes),[201,400]);d=self.request(op,'/api/dashboard')[1];self.assertEqual(d['available_usd'],30);self.assertEqual(d['reserved_usd'],70)

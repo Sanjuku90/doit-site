@@ -54,7 +54,21 @@ def complete_withdrawal(path,request_id,actor,reason,txid):
    return False
   wd=c.execute('SELECT * FROM fin_withdrawals WHERE id=?',(row['withdrawal_id'],)).fetchone()
   if not wd or wd['status']!='reserved':raise ValueError('Réservation introuvable')
-  ledger.system(c);ledger.post(c,'withdraw-paid:'+wd['id'],'withdraw_paid',[(f'user:{wd["user_id"]}:reserved',-wd['amount']),('external:payout',wd['amount'])])
+  has_table=c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='withdrawal_fee_snapshot'").fetchone()
+  fee_info=c.execute('SELECT * FROM withdrawal_fee_snapshot WHERE request_id=?',(request_id,)).fetchone() if has_table else None
+  if fee_info:
+   fee,net=fee_info['fee_cents'],fee_info['net_cents']
+   if fee+net!=wd['amount'] or fee<0 or net<=0:raise ValueError('Frais incohérents')
+  else:
+   has_meta=c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='review_web_metadata'").fetchone()
+   if has_meta and c.execute('SELECT 1 FROM review_web_metadata WHERE request_id=?',(request_id,)).fetchone():
+    raise ValueError('Ancien retrait : frais à réconcilier manuellement')
+   fee,net=0,wd['amount']
+  ledger.system(c);lines=[(f'user:{wd["user_id"]}:reserved',-wd['amount']),('external:payout',net)]
+  if fee:
+   ledger.account(c,'platform:withdrawal_fees')
+   lines.append(('platform:withdrawal_fees',fee))
+  ledger.post(c,'withdraw-paid:'+wd['id'],'withdraw_paid',lines)
   t=ledger.timestamp();c.execute('UPDATE fin_withdrawals SET status=?,updated_at=?,payout_txid=? WHERE id=?',('paid',t,txid,wd['id']))
   c.execute('INSERT INTO manual_settlements VALUES(?,?,?,?,?,?,?,?,?)',(request_id,'withdrawal',txid,wd['amount'],None,None,None,actor,t))
   c.execute('INSERT INTO review_events(request_id,actor,action,reason,created_at) VALUES(?,?,?,?,?)',(request_id,actor,'payment_manual',reason,t));return True

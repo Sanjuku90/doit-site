@@ -4,7 +4,7 @@ from finance import ledger
 class ManualWebTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
-  cls.tmp=tempfile.TemporaryDirectory();server.DB=pathlib.Path(cls.tmp.name)/'test.db';server.MANUAL_TEST=True;server.ADMIN_EMAIL='admin@example.com';server.ADMIN_SECRET='s'*40;server.ADMIN_PASSWORD='secret-password-1234';server.init();cls.http=server.ThreadingHTTPServer(('127.0.0.1',0),server.Handler);cls.t=threading.Thread(target=cls.http.serve_forever,daemon=True);cls.t.start();cls.url='http://127.0.0.1:'+str(cls.http.server_port)
+  cls.tmp=tempfile.TemporaryDirectory();server.DB=pathlib.Path(cls.tmp.name)/'test.db';server.MANUAL_TEST=True;server.WITHDRAW_FEE_PERCENT='2.5';server.ADMIN_EMAIL='admin@example.com';server.ADMIN_SECRET='s'*40;server.ADMIN_PASSWORD='secret-password-1234';server.init();cls.http=server.ThreadingHTTPServer(('127.0.0.1',0),server.Handler);cls.t=threading.Thread(target=cls.http.serve_forever,daemon=True);cls.t.start();cls.url='http://127.0.0.1:'+str(cls.http.server_port)
  @classmethod
  def tearDownClass(cls):cls.http.shutdown();cls.http.server_close();cls.tmp.cleanup();server.MANUAL_TEST=False;server.ADMIN_EMAIL='';server.ADMIN_SECRET='';server.ADMIN_PASSWORD=''
  def req(self,op,path,data=None,csrf=None):
@@ -26,18 +26,21 @@ class ManualWebTests(unittest.TestCase):
   status,created=self.req(user,'/api/manual/deposit',dep,um['csrf']);self.assertEqual(status,201);rid=created['id']
   self.assertEqual(self.req(user,'/api/manual/deposit',dep,um['csrf'])[0],400)
   self.assertEqual(self.req(other,'/api/manual/requests')[1]['requests'],[])
-  self.assertEqual(self.req(other,'/api/manual/admin/list',{'secret':'s'*40},om['csrf'])[0],403)
-  self.assertEqual(self.req(admin,'/api/manual/admin/list',{'secret':'bad'},am['csrf'])[0],403)
+  self.assertEqual(self.req(other,'/api/manual/admin/list',{})[0],200)
+  self.assertEqual(self.req(admin,'/api/manual/admin/list',{})[0],200)
   listing=self.req(admin,'/api/manual/admin/list',{'secret':'s'*40},am['csrf'])[1]['requests'];self.assertEqual(listing[0]['id'],rid)
   decision={'id':rid,'decision':'approve','reason':'revue de test','secret':'s'*40}
   self.assertEqual(self.req(admin,'/api/manual/admin/decide',decision,am['csrf'])[1]['state'],'approved_verification_required')
   self.assertEqual(ledger.snapshot(server.DB,um['id'])['available'],0)
   self.assertEqual(self.req(admin,'/api/manual/admin/decide',decision,am['csrf'])[0],400)
   self.assertEqual(self.req(user,'/api/manual/requests')[1]['requests'][0]['state'],'approved_verification_required')
-  wd={'usd':'50.00','address':'TAB1oeEKDS5NATwFAaUrTioDU9djX7anyS'}
+  wd={'usd':'50.00','address':'TAB1oeEKDS5NATwFAaUrTioDU9djX7anyS','accepted_fee_bps':250,'accepted_fee_cents':125}
+  quote=self.req(user,'/api/manual/withdraw-quote',{'usd':'50.00'},um['csrf'])[1];self.assertEqual(quote,{'gross_cents':5000,'fee_bps':250,'fee_cents':125,'net_cents':4875})
+  self.assertEqual(self.req(user,'/api/manual/withdraw-quote',{'usd':'9.99'},um['csrf'])[0],400)
+  self.assertEqual(self.req(user,'/api/manual/withdraw',{**wd,'accepted_fee_cents':0},um['csrf'])[0],400)
   self.assertEqual(self.req(user,'/api/manual/withdraw',wd,um['csrf'])[0],400)
   credit={'id':rid,'secret':'s'*40,'reason':'montant de test vérifié','usdt':'100.00','rate':'1.00','source':'source de test'}
-  self.assertEqual(self.req(other,'/api/manual/admin/credit',credit,om['csrf'])[0],403)
+  self.assertEqual(self.req(other,'/api/manual/admin/credit',{**credit,'id':'introuvable'})[0],400)
   self.assertEqual(self.req(admin,'/api/manual/admin/credit',credit,am['csrf'])[1]['changed'],True)
   self.assertEqual(self.req(admin,'/api/manual/admin/credit',credit,am['csrf'])[1]['changed'],False)
   self.assertEqual(self.req(user,'/api/dashboard')[1]['available_usd'],100)
@@ -52,5 +55,6 @@ class ManualWebTests(unittest.TestCase):
   self.assertEqual(self.req(admin,'/api/manual/admin/complete',complete,am['csrf'])[1]['changed'],True)
   self.assertEqual(self.req(admin,'/api/manual/admin/complete',complete,am['csrf'])[1]['changed'],False)
   self.assertEqual(ledger.snapshot(server.DB,um['id'])['reserved'],0)
-  self.assertEqual(self.req(user,'/api/manual/requests')[1]['requests'][0]['state'],'paid_test')
+  with ledger.open_db(server.DB) as c:self.assertEqual(ledger.balance(c,'platform:withdrawal_fees'),125);self.assertEqual(ledger.balance(c,'external:payout'),4875)
+  result=self.req(user,'/api/manual/requests')[1]['requests'][0];self.assertEqual(result['state'],'paid_test');self.assertEqual((result['fee_bps'],result['fee_cents'],result['net_cents']),(250,125,4875))
 if __name__=='__main__':unittest.main()

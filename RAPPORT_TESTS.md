@@ -1,3 +1,7 @@
+> **Version 10 :** l’accès /admin est public sans authentification. Lire `ADMIN_V10.md` ; les instructions admin ci-dessous peuvent être obsolètes.
+
+> **Version 9 :** informations historiques ; pour les règles actuelles, consulter `REGLES_V9.md`.
+
 > **Version 8 :** ce document contient des informations historiques. Pour la configuration et les limites actuelles, lire `GUIDE_MANUEL_V8.md`.
 
 # Rapport de tests : version 6

@@ -12,7 +12,7 @@ globalThis.__tests={
  receipt:()=>receipt(rows[0]),
  withdrawalReceipt:()=>receipt(rows[1]),
 };`;
-const context=vm.createContext({document:{querySelector:()=>({})},Intl,URL,URLSearchParams,console});vm.runInContext(source+test,context);
+const context=vm.createContext({document:{querySelector:()=>({})},location:{pathname:'/'},Intl,URL,URLSearchParams,console});vm.runInContext(source+test,context);
 (async()=>{
  let html=await context.__tests.history();assert(html.includes('Demandes'));assert(html.includes('d-123'));assert(html.includes('r-456'));assert(html.includes('receipt-area'));
  let deposit=await context.__tests.deposit();assert(deposit.includes('d-123'));assert(!deposit.includes('r-456'));assert(deposit.includes('Aucun contrôle sur chaîne'));

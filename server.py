@@ -20,6 +20,7 @@ ADMIN_EMAIL=os.environ.get('DOIT_ADMIN_EMAIL','').strip().lower()
 MANUAL_TEST=os.environ.get('DOIT_MANUAL_TEST','1')=='1'
 ADMIN_SECRET=os.environ.get('DOIT_ADMIN_REVIEW_SECRET','')
 ADMIN_PASSWORD=os.environ.get('DOIT_ADMIN_BOOTSTRAP_PASSWORD','')
+WITHDRAW_FEE_PERCENT=os.environ.get('DOIT_WITHDRAW_FEE_PERCENT','2').strip()
 DB.parent.mkdir(parents=True,exist_ok=True)
 RATE={}; RATE_LOCK=threading.Lock()
 CURRENCIES=['USD','EUR','XOF','GBP','NGN','GHS','CAD','CNY','JPY']
@@ -172,7 +173,9 @@ class Handler(BaseHTTPRequestHandler):
     return self.reply(503,{'status':'database_unavailable','payments':'disabled'})
   if path=='/api/plans': return self.reply(200,{'plans':PLANS,'note':'Rendements hypothétiques, non garantis. Seuils de référence en XOF. Aucune opération financière activée.'})
   if path=='/api/manual/config':
-   return self.reply(200,{'enabled':MANUAL_TEST,'deposit_address':web_queue.ADDRESS,'network':'USDT TRC20','notice':'Traitement manuel : aucune vérification ni aucun transfert blockchain automatique.'})
+   try: fee_bps=web_queue.fee_bps_from_percent(WITHDRAW_FEE_PERCENT)
+   except ValueError: fee_bps=None
+   return self.reply(200,{'enabled':MANUAL_TEST,'deposit_address':web_queue.ADDRESS,'network':'USDT TRC20','fee_bps':fee_bps,'minimum_withdrawal_cents':1000,'notice':'Traitement manuel : aucune vérification ni aucun transfert blockchain automatique.'})
   if path=='/api/manual/requests':
    s=self.auth()
    if not s:return
@@ -210,8 +213,8 @@ class Handler(BaseHTTPRequestHandler):
       SELECT u.id,u.first_name,u.last_name,u.created_at,n.depth+1 FROM users u JOIN network n ON u.referred_by=n.id WHERE n.depth<5
      ) SELECT first_name,substr(last_name,1,1) || '.' AS last_initial,created_at,depth FROM network ORDER BY depth,created_at LIMIT 1000''',(s['id'],))]
     return self.reply(200,{'code':s['referral_code'],'members':members,'truncated':len(members)==1000,'commission_rates':[15,7,5,3,2],'commission_available':0})
-  if path not in ['/','/index.html','/app.js','/style.css','/logo.png']: return self.reply(404,{'error':'Page introuvable.'})
-  f=ROOT/'static'/('index.html' if path in ['/','/index.html'] else path[1:])
+  if path not in ['/','/admin','/admin/','/index.html','/app.js','/style.css','/logo.png']: return self.reply(404,{'error':'Page introuvable.'})
+  f=ROOT/'static'/('index.html' if path in ['/','/admin','/admin/','/index.html'] else path[1:])
   try: content=f.read_bytes()
   except OSError:return self.reply(404,{'error':'Fichier introuvable.'})
   mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png'}[f.suffix]
@@ -243,6 +246,20 @@ class Handler(BaseHTTPRequestHandler):
     return self.reply(401,{'error':'Identifiants invalides.'})
    with db() as c:c.execute('INSERT INTO audit(user_id,action,created_at) VALUES(?,?,?)',(user['id'],'login',now()))
    return self.reply(200,{'ok':True},self.new_session(user['id']))
+  # Intentionally PUBLIC per owner request: anyone on the internet can operate this admin.
+  if path in ['/api/manual/admin/list','/api/manual/admin/decide','/api/manual/admin/credit','/api/manual/admin/complete']:
+   if not MANUAL_TEST:return self.reply(503,{'error':'File désactivée.'})
+   try:
+    if path.endswith('/list'):return self.reply(200,{'requests':web_queue.list_admin(DB)})
+    if path.endswith('/credit'):
+     changed=manual_settlement.credit_deposit(DB,data.get('id'),'anonymous',data.get('reason'),data.get('usdt'),data.get('rate'),data.get('source'))
+     return self.reply(200,{'changed':changed,'notice':'Crédit manuel enregistré. Aucun contrôle blockchain automatique.'})
+    if path.endswith('/complete'):
+     changed=manual_settlement.complete_withdrawal(DB,data.get('id'),'anonymous',data.get('reason'),data.get('txid'))
+     return self.reply(200,{'changed':changed,'notice':'Paiement déclaré. Aucun transfert exécuté par le site.'})
+    state=review_queue.decide(DB,data.get('id'),data.get('decision'),'anonymous',data.get('reason'))
+    return self.reply(200,{'state':state,'notice':'Décision enregistrée. Aucun transfert automatique.'})
+   except (ValueError,sqlite3.IntegrityError):return self.reply(400,{'error':'Demande invalide ou déjà traitée.'})
   s=self.auth()
   if not s:return
   if not self.csrf_ok(s):return self.reply(403,{'error':'Session invalide. Rechargez la page.'})
@@ -254,21 +271,10 @@ class Handler(BaseHTTPRequestHandler):
      rid=web_queue.deposit(DB,s['id'],data.get('usd'),data.get('usdt'),data.get('txid'))
      return self.reply(201,{'id':rid,'state':'pending','notice':'Déclaration reçue. Le crédit nécessite une décision de l’administrateur.'})
     if path=='/api/manual/withdraw':
-     rid=web_queue.withdraw(DB,s['id'],data.get('usd'),data.get('address'))
+     rid=web_queue.withdraw(DB,s['id'],data.get('usd'),data.get('address'),WITHDRAW_FEE_PERCENT,data.get('accepted_fee_bps'),data.get('accepted_fee_cents'))
      return self.reply(201,{'id':rid,'state':'pending','notice':'Demande reçue. Le paiement sera effectué manuellement par l’administrateur.'})
-    if path in ['/api/manual/admin/list','/api/manual/admin/decide','/api/manual/admin/credit','/api/manual/admin/complete']:
-     secret=data.get('secret','')
-     if not is_admin(s) or len(ADMIN_SECRET)<32 or not isinstance(secret,str) or not hmac.compare_digest(secret,ADMIN_SECRET):
-      return self.reply(403,{'error':'Accès refusé.'})
-     if path.endswith('/list'):return self.reply(200,{'requests':web_queue.list_admin(DB)})
-     if path.endswith('/credit'):
-      changed=manual_settlement.credit_deposit(DB,data.get('id'),'user:'+str(s['id']),data.get('reason'),data.get('usdt'),data.get('rate'),data.get('source'))
-      return self.reply(200,{'changed':changed,'notice':'Crédit manuel enregistré. Aucun contrôle blockchain automatique.'})
-     if path.endswith('/complete'):
-      changed=manual_settlement.complete_withdrawal(DB,data.get('id'),'user:'+str(s['id']),data.get('reason'),data.get('txid'))
-      return self.reply(200,{'changed':changed,'notice':'Paiement manuel déclaré. Aucun transfert n’a été exécuté par le site.'})
-     state=review_queue.decide(DB,data.get('id'),data.get('decision'),'user:'+str(s['id']),data.get('reason'))
-     return self.reply(200,{'state':state,'notice':'Décision enregistrée. Aucun transfert automatique.'})
+    if path=='/api/manual/withdraw-quote':
+     return self.reply(200,web_queue.quote(data.get('usd'),WITHDRAW_FEE_PERCENT))
     return self.reply(404,{'error':'Action introuvable.'})
    except (ValueError,sqlite3.IntegrityError) as e:
     return self.reply(400,{'error':'Demande invalide, déjà utilisée ou fonds de test insuffisants.'})

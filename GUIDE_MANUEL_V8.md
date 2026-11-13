@@ -1,3 +1,7 @@
+> **Version 10 :** l’accès /admin est public sans authentification. Lire `ADMIN_V10.md` ; les instructions admin ci-dessous peuvent être obsolètes.
+
+> **Version 9 :** informations historiques ; pour les règles actuelles, consulter `REGLES_V9.md`.
+
 # DO IT v8 : traitement manuel
 
 Cette version active la file manuelle par défaut (`DOIT_MANUAL_TEST=1`, nom historique de la variable). Le logiciel ne vérifie pas la blockchain, n'envoie pas de paiement, ne prouve pas les réserves et n'a pas été audité. L'administrateur doit effectuer ses vérifications et paiements hors du site. Toute inscription dans le registre dépend des déclarations administrateur : une erreur ou fraude peut créditer à tort un compte. NE PAS accepter de capitaux ni de données client sans validation indépendante, contrôles adaptés et conformité.

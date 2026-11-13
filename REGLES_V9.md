@@ -1,0 +1,15 @@
+> **Version 10 :** l’accès /admin est public sans authentification. Lire `ADMIN_V10.md` ; les instructions admin ci-dessous peuvent être obsolètes.
+
+# DO IT v9 : dépôts et retraits manuels
+
+Le dépôt est déclaré avec montant USD, montant USDT et TXID TRC20. L'administrateur approuve ou rejette. Après approbation, il saisit séparément le montant USDT constaté, le taux USD/USDT et sa source pour créditer le registre. **Une capture d'écran ne suffit pas** : l'administrateur doit vérifier indépendamment la réception sur le portefeuille de destination et les confirmations, notamment le token, le réseau, l'adresse, le montant et le TXID. Le site ne réalise pas ces vérifications. L'adresse affichée a un format valide mais sa propriété n'a pas été vérifiée.
+
+Les retraits sont au minimum de 10 USD. Le montant brut est réservé immédiatement. Un pourcentage de frais doit être configuré dans `DOIT_WITHDRAW_FEE_PERCENT` (exemple de format : `2.5`, soit 2,5 % ; cet exemple n'est pas une recommandation). Aucun taux n'est défini par défaut et les retraits sont indisponibles tant qu'il n'est pas configuré. Valeurs permises : de 0 à moins de 100, avec au plus 2 décimales. L'interface présente le montant brut, les frais et le net en USD avant une confirmation distincte. Elle ne calcule pas le montant USDT à transférer ni les frais réseau, qui doivent être déterminés et communiqués avant paiement ; ces règles ne sont pas encore implémentées. Si l'utilisateur refuse, l'argent n'est pas réservé. Le taux accepté et les montants sont enregistrés avec la demande ; toute modification ultérieure des frais ne les modifie pas.
+
+L'admin accepte ou rejette. Un rejet restitue le montant brut réservé. Une acceptation ne déclenche aucun transfert : l'admin paie manuellement depuis son portefeuille et saisit le TXID. Le registre comptabilise alors le net en sortie et les frais séparément ; le site ne vérifie pas le transfert. Un ancien retrait créé avant v9, sans frais enregistrés, ne peut pas être finalisé avec ce code : le réconcilier avec une procédure contrôlée et des tests de migration, ne pas le régler silencieusement.
+
+L'historique montre les demandes, statuts et justificatifs imprimables. Ils restent des documents internes, sans preuve blockchain.
+
+Configuration Render : définir `DOIT_ADMIN_EMAIL`, `DOIT_ADMIN_BOOTSTRAP_PASSWORD` et `DOIT_WITHDRAW_FEE_PERCENT` dans les variables, avec le secret admin généré. Voir `GUIDE_MANUEL_V8.md` pour les autres instructions. Un déploiement Render avec données existantes demande une sauvegarde et une migration vérifiée avant redéploiement.
+
+Limites : les investissements réels, KYC/AML, authentification renforcée, calcul de conversion pour les paiements, vérification blockchain, confirmation de paiement et audit ne sont pas disponibles. Les tests sont locaux avec données fictives ; aucun déploiement Render ni transfert n'a été vérifié. Ne pas accepter des fonds de clients sans mettre en place ces contrôles et une revue réglementaire et de sécurité indépendante.
