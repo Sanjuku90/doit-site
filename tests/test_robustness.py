@@ -36,7 +36,7 @@ class RobustnessTests(unittest.TestCase):
   a,am=self.new_user('a@tests.invalid');b,bm=self.new_user('b@tests.invalid')
   payload={'usd':'10','usdt':'10','txid':'b'*64};self.assertEqual(self.request(a,'/api/manual/deposit',payload,am['csrf'])[0],201)
   self.assertEqual(self.request(b,'/api/manual/requests')[1]['requests'],[])
-  for path in ['/api/deposit','/api/withdraw','/api/invest']:
+  for path in ['/api/deposit','/api/withdraw']:
    self.assertEqual(self.request(a,path,{},am['csrf'])[0],503)
   server.MANUAL_TEST=False
   try:

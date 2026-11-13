@@ -4,7 +4,7 @@ Money movement is intentionally disabled until verified integrations are impleme
 """
 import os, sys, json, re, sqlite3, secrets, hashlib, hmac, time, threading, logging
 import urllib.request
-from finance import web_queue,review_queue,ledger as finledger,manual_settlement
+from finance import web_queue,review_queue,ledger as finledger,manual_settlement,investments
 from decimal import Decimal, ROUND_HALF_EVEN
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -65,6 +65,7 @@ def init():
     c.execute('INSERT INTO admin_principals(user_id) VALUES(?)',(cur.lastrowid,))
  web_queue.init(DB)
  manual_settlement.init(DB)
+ investments.init(DB)
 
 def is_admin(session):
  if not ADMIN_EMAIL or session['email'].lower()!=ADMIN_EMAIL:return False
@@ -171,7 +172,11 @@ class Handler(BaseHTTPRequestHandler):
     return self.reply(200,{'status':'ok','payments':'disabled'})
    except sqlite3.Error:
     return self.reply(503,{'status':'database_unavailable','payments':'disabled'})
-  if path=='/api/plans': return self.reply(200,{'plans':PLANS,'note':'Rendements hypothétiques, non garantis. Seuils de référence en XOF. Aucune opération financière activée.'})
+  if path=='/api/plans': return self.reply(200,{'plans':PLANS,'note':'Rendements théoriques non garantis. Seuils XOF convertis en USD au taux publié lors de l’activation.'})
+  if path=='/api/investments':
+   s=self.auth()
+   if not s:return
+   return self.reply(200,{'investments':investments.list_for_user(DB,s['id'])})
   if path=='/api/manual/config':
    try: fee_bps=web_queue.fee_bps_from_percent(WITHDRAW_FEE_PERCENT)
    except ValueError: fee_bps=None
@@ -206,13 +211,14 @@ class Handler(BaseHTTPRequestHandler):
     if path=='/api/dashboard':
      rows=[dict(r) for r in c.execute('SELECT kind,amount_usd_minor,amount_xof_minor,description,created_at FROM ledger WHERE user_id=? ORDER BY id DESC LIMIT 30',(s['id'],))]
      bal=finledger.snapshot(DB,s['id'])
-     return self.reply(200,{'available_usd':bal['available']/100,'invested_usd':bal['invested']/100,'accrued_usd':0,'commissions_usd':0,'bonus_xof':5000,'bonus_usd':None,'reserved_usd':bal['reserved']/100,'entries':rows,'payments_enabled':False})
+     inv=investments.list_for_user(DB,s['id'])
+     return self.reply(200,{'available_usd':bal['available']/100,'invested_usd':bal['invested']/100,'accrued_usd':sum(x['total_accrued_cents'] for x in inv if x['status']!='settled')/100,'commissions_usd':investments.funded_commissions(DB,s['id'])/100,'bonus_xof':5000,'bonus_usd':None,'reserved_usd':bal['reserved']/100,'entries':rows,'investments':inv,'payments_enabled':False})
     members=[dict(r) for r in c.execute('''WITH RECURSIVE network(id,first_name,last_name,created_at,depth) AS (
       SELECT id,first_name,last_name,created_at,1 FROM users WHERE referred_by=?
       UNION ALL
       SELECT u.id,u.first_name,u.last_name,u.created_at,n.depth+1 FROM users u JOIN network n ON u.referred_by=n.id WHERE n.depth<5
      ) SELECT first_name,substr(last_name,1,1) || '.' AS last_initial,created_at,depth FROM network ORDER BY depth,created_at LIMIT 1000''',(s['id'],))]
-    return self.reply(200,{'code':s['referral_code'],'members':members,'truncated':len(members)==1000,'commission_rates':[15,7,5,3,2],'commission_available':0})
+    return self.reply(200,{'code':s['referral_code'],'members':members,'truncated':len(members)==1000,'commission_rates':[15,7,5,3,2],'commission_credited_usd':investments.funded_commissions(DB,s['id'])/100})
   if path not in ['/','/admin','/admin/','/index.html','/app.js','/style.css','/logo.png']: return self.reply(404,{'error':'Page introuvable.'})
   f=ROOT/'static'/('index.html' if path in ['/','/admin','/admin/','/index.html'] else path[1:])
   try: content=f.read_bytes()
@@ -263,6 +269,16 @@ class Handler(BaseHTTPRequestHandler):
   s=self.auth()
   if not s:return
   if not self.csrf_ok(s):return self.reply(403,{'error':'Session invalide. Rechargez la page.'})
+  if path=='/api/invest':
+   try:
+    if not isinstance(data.get('plan'),str) or data['plan'] not in investments.PLANS:raise ValueError('Plan invalide')
+    web_queue.parse_cents(data.get('usd'))
+    finledger.valid_key(data.get('request_key'))
+    quote=conversion('1','USD','XOF')
+    result=investments.create(DB,s['id'],data.get('plan'),data.get('usd'),data.get('request_key'),quote)
+    return self.reply(201 if result['created'] else 200,result)
+   except ConnectionError:return self.reply(503,{'error':'Taux de change indisponible. Réessayez plus tard.'})
+   except (ValueError,sqlite3.IntegrityError) as e:return self.reply(400,{'error':str(e)})
   if path.startswith('/api/manual/'):
    if not MANUAL_TEST:return self.reply(503,{'error':'File de test désactivée.'})
    if not allow('manual:'+self.client_address[0]):return self.reply(429,{'error':'Trop de tentatives. Réessayez plus tard.'})
@@ -288,8 +304,17 @@ class Handler(BaseHTTPRequestHandler):
    if currency not in ['USD','EUR','XOF','GBP','NGN','GHS','CAD','CNY','JPY']: return self.reply(400,{'error':'Devise non prise en charge.'})
    with db() as c:c.execute('UPDATE users SET display_currency=? WHERE id=?',(currency,s['id']))
    return self.reply(200,{'ok':True})
-  if path in ['/api/deposit','/api/withdraw','/api/invest']: return self.reply(503,{'error':'Service non activé : aucune transaction réelle ne peut être effectuée.'})
+  if path in ['/api/deposit','/api/withdraw']: return self.reply(503,{'error':'Service non activé : aucune transaction réelle ne peut être effectuée.'})
   return self.reply(404,{'error':'Action introuvable.'})
  def do_HEAD(self): self.send_response(405); self.end_headers()
+def settlement_worker():
+ while True:
+  try:
+   stats=investments.settle_due(DB)
+   if stats['completed'] or stats['awaiting_funding']:logging.info('Échéances : %s',stats)
+  except Exception:logging.exception('Erreur de traitement des échéances')
+  time.sleep(60)
 if __name__=='__main__':
- logging.basicConfig(level=logging.INFO,format='%(asctime)s %(message)s'); init(); print(f'DO IT: http://{HOST}:{PORT} | paiements désactivés',flush=True); ThreadingHTTPServer((HOST,PORT),Handler).serve_forever()
+ logging.basicConfig(level=logging.INFO,format='%(asctime)s %(message)s'); init()
+ threading.Thread(target=settlement_worker,daemon=True).start()
+ print(f'DO IT: http://{HOST}:{PORT} | transferts manuels',flush=True); ThreadingHTTPServer((HOST,PORT),Handler).serve_forever()
