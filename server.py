@@ -17,7 +17,8 @@ DB=Path(os.environ.get('DOIT_DB', str(ROOT/'data'/'doit.sqlite3')))
 HOST=os.environ.get('DOIT_HOST','127.0.0.1'); PORT=int(os.environ.get('PORT','8080'))
 SECURE=os.environ.get('DOIT_SECURE_COOKIE','0')=='1'
 ADMIN_EMAIL=os.environ.get('DOIT_ADMIN_EMAIL','').strip().lower()
-MANUAL_TEST=os.environ.get('DOIT_MANUAL_TEST','1')=='1'
+# Les demandes manuelles restent actives indépendamment de l'ancien indicateur DOIT_MANUAL_TEST.
+MANUAL_OPERATIONS=True
 ADMIN_SECRET=os.environ.get('DOIT_ADMIN_REVIEW_SECRET','')
 ADMIN_PASSWORD=os.environ.get('DOIT_ADMIN_BOOTSTRAP_PASSWORD','')
 WITHDRAW_FEE_PERCENT=os.environ.get('DOIT_WITHDRAW_FEE_PERCENT','2').strip()
@@ -169,9 +170,9 @@ class Handler(BaseHTTPRequestHandler):
   if path=='/api/health':
    try:
     with db() as c:c.execute('SELECT COUNT(*) FROM users').fetchone()
-    return self.reply(200,{'status':'ok','payments':'disabled'})
+    return self.reply(200,{'status':'ok','manual_operations':'enabled'})
    except sqlite3.Error:
-    return self.reply(503,{'status':'database_unavailable','payments':'disabled'})
+    return self.reply(503,{'status':'database_unavailable','manual_operations':'enabled'})
   if path=='/api/plans': return self.reply(200,{'plans':PLANS,'note':'Rendements théoriques non garantis. Seuils XOF convertis en USD au taux publié lors de l’activation.'})
   if path=='/api/investments':
    s=self.auth()
@@ -180,11 +181,12 @@ class Handler(BaseHTTPRequestHandler):
   if path=='/api/manual/config':
    try: fee_bps=web_queue.fee_bps_from_percent(WITHDRAW_FEE_PERCENT)
    except ValueError: fee_bps=None
-   return self.reply(200,{'enabled':MANUAL_TEST,'deposit_address':web_queue.ADDRESS,'network':'USDT TRC20','fee_bps':fee_bps,'minimum_withdrawal_cents':1000,'notice':'Traitement manuel : aucune vérification ni aucun transfert blockchain automatique.'})
+   sess=self.session()
+   admin=bool(sess and is_admin(sess))
+   return self.reply(200,{'enabled':True,'is_admin':admin,'deposit_address':web_queue.ADDRESS,'network':'USDT TRC20','fee_bps':fee_bps,'minimum_withdrawal_cents':1000,'notice':'Traitement manuel : chaque dépôt et retrait est contrôlé par l’administrateur.'})
   if path=='/api/manual/requests':
    s=self.auth()
    if not s:return
-   if not MANUAL_TEST:return self.reply(503,{'error':'File de test désactivée.'})
    return self.reply(200,{'requests':web_queue.list_user(DB,s['id'])})
   if path=='/api/convert':
    query=parse_qs(urlparse(self.path).query)
@@ -252,19 +254,22 @@ class Handler(BaseHTTPRequestHandler):
     return self.reply(401,{'error':'Identifiants invalides.'})
    with db() as c:c.execute('INSERT INTO audit(user_id,action,created_at) VALUES(?,?,?)',(user['id'],'login',now()))
    return self.reply(200,{'ok':True},self.new_session(user['id']))
-  # Intentionally PUBLIC per owner request: anyone on the internet can operate this admin.
   if path in ['/api/manual/admin/list','/api/manual/admin/decide','/api/manual/admin/credit','/api/manual/admin/complete']:
-   if not MANUAL_TEST:return self.reply(503,{'error':'File désactivée.'})
+   admin_session=self.auth()
+   if not admin_session:return
+   if not is_admin(admin_session):return self.reply(403,{'error':'Accès administrateur non autorisé.'})
+   if not self.csrf_ok(admin_session):return self.reply(403,{'error':'Session invalide. Rechargez la page.'})
+   actor='admin:'+str(admin_session['id'])
    try:
     if path.endswith('/list'):return self.reply(200,{'requests':web_queue.list_admin(DB)})
     if path.endswith('/credit'):
-     changed=manual_settlement.credit_deposit(DB,data.get('id'),'anonymous',data.get('reason'),data.get('usdt'),data.get('rate'),data.get('source'))
-     return self.reply(200,{'changed':changed,'notice':'Crédit manuel enregistré. Aucun contrôle blockchain automatique.'})
+     changed=manual_settlement.credit_deposit(DB,data.get('id'),actor,data.get('reason'),data.get('usdt'),data.get('rate'),data.get('source'))
+     return self.reply(200,{'changed':changed,'notice':'Crédit manuel enregistré après vérification par l’administrateur.'})
     if path.endswith('/complete'):
-     changed=manual_settlement.complete_withdrawal(DB,data.get('id'),'anonymous',data.get('reason'),data.get('txid'))
-     return self.reply(200,{'changed':changed,'notice':'Paiement déclaré. Aucun transfert exécuté par le site.'})
-    state=review_queue.decide(DB,data.get('id'),data.get('decision'),'anonymous',data.get('reason'))
-    return self.reply(200,{'state':state,'notice':'Décision enregistrée. Aucun transfert automatique.'})
+     changed=manual_settlement.complete_withdrawal(DB,data.get('id'),actor,data.get('reason'),data.get('txid'))
+     return self.reply(200,{'changed':changed,'notice':'Paiement manuel enregistré. Le site n’a effectué aucun transfert.'})
+    state=review_queue.decide(DB,data.get('id'),data.get('decision'),actor,data.get('reason'))
+    return self.reply(200,{'state':state,'notice':'Décision administrative enregistrée.'})
    except (ValueError,sqlite3.IntegrityError):return self.reply(400,{'error':'Demande invalide ou déjà traitée.'})
   s=self.auth()
   if not s:return
@@ -280,7 +285,6 @@ class Handler(BaseHTTPRequestHandler):
    except ConnectionError:return self.reply(503,{'error':'Taux de change indisponible. Réessayez plus tard.'})
    except (ValueError,sqlite3.IntegrityError) as e:return self.reply(400,{'error':str(e)})
   if path.startswith('/api/manual/'):
-   if not MANUAL_TEST:return self.reply(503,{'error':'File de test désactivée.'})
    if not allow('manual:'+self.client_address[0]):return self.reply(429,{'error':'Trop de tentatives. Réessayez plus tard.'})
    try:
     if path=='/api/manual/deposit':
@@ -293,7 +297,7 @@ class Handler(BaseHTTPRequestHandler):
      return self.reply(200,web_queue.quote(data.get('usd'),WITHDRAW_FEE_PERCENT))
     return self.reply(404,{'error':'Action introuvable.'})
    except (ValueError,sqlite3.IntegrityError) as e:
-    return self.reply(400,{'error':'Demande invalide, déjà utilisée ou fonds de test insuffisants.'})
+    return self.reply(400,{'error':'Demande invalide, déjà utilisée ou solde disponible insuffisant.'})
   if path=='/api/logout':
    cookie=SimpleCookie(); cookie.load(self.headers.get('Cookie','')); raw=cookie.get('doit_session')
    if raw:

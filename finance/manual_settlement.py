@@ -1,8 +1,5 @@
-"""Manual settlement prototype. Values are administrator assertions, not TRON proof.
-
-Not connected to the public application. Do not use with real funds; access control,
-KYC, independent reconciliation and real transaction verification are not implemented.
-All changes to this prototype must remain atomic with a full audit trail.
+"""Manual settlement ledger. Admin-entered values and TXIDs are audit records, not blockchain proof.
+The administrator must independently verify deposits and execute payouts outside the application.
 """
 import re
 from decimal import Decimal, ROUND_HALF_EVEN

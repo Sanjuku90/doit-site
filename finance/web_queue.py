@@ -1,4 +1,4 @@
-"""TEST ONLY. Web intake for the manual review queue. Never transfers real funds."""
+"""Web intake for administrator-reviewed deposit and withdrawal requests. No automatic transfers."""
 import hashlib, re, secrets
 from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN
 from finance import ledger,review_queue

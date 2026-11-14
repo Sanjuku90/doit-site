@@ -1,32 +1,11 @@
-> **Version 10 :** l’accès /admin est public sans authentification. Lire `ADMIN_V10.md` ; les instructions admin ci-dessous peuvent être obsolètes.
+# Rapport de vérification — correctif V12
 
-> **Version 9 :** informations historiques ; pour les règles actuelles, consulter `REGLES_V9.md`.
+Vérifications exécutées dans l’environnement de travail :
 
-> **Version 8 :** ce document contient des informations historiques. Pour la configuration et les limites actuelles, lire `GUIDE_MANUEL_V8.md`.
+- `python -m py_compile server.py finance/*.py` : réussi.
+- `node --check static/app.js` : réussi.
+- `python -m unittest discover -s tests -q` : 35 tests réussis.
 
-# Rapport de tests : version 6
+Les tests couvrent notamment les demandes de dépôt, les retraits et réservations, les frais, le registre comptable, les doubles soumissions, l’approbation manuelle, l’enregistrement du paiement et le refus d’accès administrateur aux utilisateurs non autorisés.
 
-## Vérifié localement
-
-- 23 tests Python automatisés : comptes et sessions, contrôle CSRF, confidentialité des demandes, fonctionnement de la file manuelle de test, approbation et rejet, restitution du montant réservé, TXID en double, réservations et décisions concurrentes, plafonds, simulation des échéances et commissions, intégrité du registre et persistance après redémarrage.
-- Convertisseur : réponses du fournisseur simulées et panne simulée ; aucun appel en ligne dans cet environnement.
-- Tests de rendu des fonctions JavaScript avec données fictives : demandes de test visibles dans l'historique et filtres dépôt/retrait, contenu des justificatifs et encodage HTML. Ces tests ne sont pas un test de navigateur complet.
-- Syntaxe JavaScript et Python vérifiée. Aperçu d'impression sur tailles mobiles simulées effectué sur la version précédente du reçu ; aucun vrai téléphone ni imprimante utilisé.
-
-## Amélioration apportée
-
-L'historique affiche maintenant les demandes de dépôt et retrait de test et donne accès aux justificatifs correspondants. Les justificatifs restent des demandes, pas des preuves de paiement.
-
-## Non vérifié et non opérationnel
-
-Aucun déploiement sur Render, test navigateur complet de toutes les pages, service de change en direct, vérification TRON, ni transaction blockchain réelle. L'accès admin, l'authentification, la protection des données et le système financier n'ont pas fait l'objet d'un audit indépendant.
-
-Les dépôts, paiements et investissements réels restent désactivés. Les commissions et le moteur financier expérimental ne sont pas reliés à un système financier réel. Ne pas utiliser avec de vrais fonds ni des données de clients.
-
-## Rejouer
-
-```
-python3 -m unittest discover -s tests -v
-node tests/test_ui.js
-node --check static/app.js
-```
+Limites : ces tests locaux ne remplacent pas un audit de sécurité, un déploiement réel, une vérification de la blockchain, un test de transfert USDT ni une vérification réglementaire. Le test de conversion dépend d’un fournisseur de taux externe et d’une connexion réseau.

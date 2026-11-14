@@ -26,8 +26,8 @@ class ManualWebTests(unittest.TestCase):
   status,created=self.req(user,'/api/manual/deposit',dep,um['csrf']);self.assertEqual(status,201);rid=created['id']
   self.assertEqual(self.req(user,'/api/manual/deposit',dep,um['csrf'])[0],400)
   self.assertEqual(self.req(other,'/api/manual/requests')[1]['requests'],[])
-  self.assertEqual(self.req(other,'/api/manual/admin/list',{})[0],200)
-  self.assertEqual(self.req(admin,'/api/manual/admin/list',{})[0],200)
+  self.assertEqual(self.req(other,'/api/manual/admin/list',{})[0],403)
+  self.assertEqual(self.req(admin,'/api/manual/admin/list',{})[0],403)
   listing=self.req(admin,'/api/manual/admin/list',{'secret':'s'*40},am['csrf'])[1]['requests'];self.assertEqual(listing[0]['id'],rid)
   decision={'id':rid,'decision':'approve','reason':'revue de test','secret':'s'*40}
   self.assertEqual(self.req(admin,'/api/manual/admin/decide',decision,am['csrf'])[1]['state'],'approved_verification_required')
@@ -40,7 +40,7 @@ class ManualWebTests(unittest.TestCase):
   self.assertEqual(self.req(user,'/api/manual/withdraw',{**wd,'accepted_fee_cents':0},um['csrf'])[0],400)
   self.assertEqual(self.req(user,'/api/manual/withdraw',wd,um['csrf'])[0],400)
   credit={'id':rid,'secret':'s'*40,'reason':'montant de test vérifié','usdt':'100.00','rate':'1.00','source':'source de test'}
-  self.assertEqual(self.req(other,'/api/manual/admin/credit',{**credit,'id':'introuvable'})[0],400)
+  self.assertEqual(self.req(other,'/api/manual/admin/credit',{**credit,'id':'introuvable'})[0],403)
   self.assertEqual(self.req(admin,'/api/manual/admin/credit',credit,am['csrf'])[1]['changed'],True)
   self.assertEqual(self.req(admin,'/api/manual/admin/credit',credit,am['csrf'])[1]['changed'],False)
   self.assertEqual(self.req(user,'/api/dashboard')[1]['available_usd'],100)

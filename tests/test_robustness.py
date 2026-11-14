@@ -32,16 +32,16 @@ class RobustnessTests(unittest.TestCase):
   def send(_):return self.request(op,'/api/manual/withdraw',payload,me['csrf'])[0]
   with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:codes=list(pool.map(send,range(2)))
   self.assertEqual(sorted(codes),[201,400]);d=self.request(op,'/api/dashboard')[1];self.assertEqual(d['available_usd'],30);self.assertEqual(d['reserved_usd'],70)
- def test_private_records_and_disabled_mode(self):
+ def test_private_records_and_operations_stay_enabled(self):
   a,am=self.new_user('a@tests.invalid');b,bm=self.new_user('b@tests.invalid')
   payload={'usd':'10','usdt':'10','txid':'b'*64};self.assertEqual(self.request(a,'/api/manual/deposit',payload,am['csrf'])[0],201)
   self.assertEqual(self.request(b,'/api/manual/requests')[1]['requests'],[])
   for path in ['/api/deposit','/api/withdraw']:
    self.assertEqual(self.request(a,path,{},am['csrf'])[0],503)
   server.MANUAL_TEST=False
-  try:
-   self.assertEqual(self.request(a,'/api/manual/requests')[0],503);self.assertEqual(self.request(a,'/api/manual/deposit',payload,am['csrf'])[0],503)
-  finally:server.MANUAL_TEST=True
+  self.assertEqual(self.request(a,'/api/manual/requests')[0],200)
+  self.assertEqual(self.request(a,'/api/manual/deposit',{'usd':'11','usdt':'11','txid':'c'*64},am['csrf'])[0],201)
+  server.MANUAL_TEST=True
  def test_declared_address_checksum(self):
   self.assertTrue(web_queue.tron_address(web_queue.ADDRESS));self.assertFalse(web_queue.tron_address(web_queue.ADDRESS[:-1]+'T'));self.assertFalse(web_queue.tron_address('invalid'))
 if __name__=='__main__':unittest.main()

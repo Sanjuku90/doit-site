@@ -1,31 +1,24 @@
-> **Version 10 :** l’accès /admin est public sans authentification. Lire `ADMIN_V10.md` ; les instructions admin ci-dessous peuvent être obsolètes.
+# Traitement manuel des dépôts et retraits
 
-> **Version 9 :** informations historiques ; pour les règles actuelles, consulter `REGLES_V9.md`.
+Le parcours manuel est actif. `DOIT_MANUAL_TEST` est un ancien paramètre sans effet sur l’activation.
 
-> **Version 8 :** ce document contient des informations historiques. Pour la configuration et les limites actuelles, lire `GUIDE_MANUEL_V8.md`.
+## Dépôts
 
-# File manuelle branchée au site : tests uniquement
+1. Le membre déclare un montant USD, un montant USDT et le TXID.
+2. La demande apparaît dans `/admin` pour le compte administrateur authentifié.
+3. L’administrateur vérifie hors du site le TXID sur un explorateur TRON, le réseau TRC20, le contrat du jeton, l’adresse de destination, le montant et les confirmations.
+4. L’administrateur approuve la demande, puis enregistre les valeurs réellement vérifiées pour créditer le registre.
 
-Le site prend en charge les déclarations de dépôt et demandes de retrait de test, une file d'approbation/rejet, un historique utilisateur et un justificatif de demande imprimable. Les justificatifs ne sont PAS des reçus de paiement ou de dépôt confirmé. Aucun fonds réel ne doit être envoyé.
+L’approbation seule ne crédite rien. Le crédit manuel constitue une écriture du registre à partir des informations saisies par l’administrateur ; il ne s’agit pas d’une preuve blockchain automatique.
 
-Cette version ne vérifie pas TRON, ne crédite pas de dépôts, ne réalise aucun retrait, ne met pas les investissements et commissions en production. Elle ne doit pas être utilisée avec des clients ni leurs données. L'adresse communiquée est affichée uniquement comme référence de test et sa propriété n'a pas été vérifiée.
+## Retraits
 
-## Utilisation locale
+1. Le membre saisit le montant et son adresse TRON. Le serveur calcule les frais (2 % par défaut) et réserve le montant brut. Minimum : 10 USD.
+2. L’administrateur approuve ou refuse la demande. Un refus restitue le montant réservé.
+3. En cas d’approbation, l’administrateur effectue lui-même le transfert depuis son portefeuille, puis saisit le TXID du paiement pour clôturer la demande.
 
-Le mode est désactivé par défaut, y compris sur Render. Pour le tester localement avec des comptes fictifs :
+L’approbation ne déclenche pas le transfert. Le site ne conserve aucune clé privée.
 
-1. Installer Python 3.10+, puis ouvrir un terminal dans le dossier.
-2. Définir les variables d'environnement suivantes en local :
+## Accès administrateur
 
-```sh
-export DOIT_MANUAL_TEST=1
-export DOIT_ADMIN_EMAIL=admin-test@example.invalid
-export DOIT_ADMIN_REVIEW_SECRET="$(python3 -c 'import secrets;print(secrets.token_urlsafe(48))')"
-python3 server.py
-```
-
-3. Créer d'abord le compte admin fictif avec cet e-mail et garder le secret dans un gestionnaire sûr. À la page Administration, entrer le secret pour afficher et traiter la file. L'accès exige à la fois la session, l'adresse configurée, le jeton CSRF et le secret. Ce mécanisme simple n'est pas un MFA ni une authentification admin auditée.
-4. Créer un second compte fictif. Dans Dépôts, déclarer un montant USD, un montant USDT et un TXID de test de 64 caractères hexadécimaux. Le reçu imprimable est disponible dans Mes demandes. Après approbation, l'admin peut saisir un montant USDT de test, un taux et sa source pour créditer le registre fictif. Aucune transaction n'est vérifiée sur la blockchain.
-5. Un retrait exige un solde déjà disponible dans le registre expérimental. Un crédit de test peut alimenter le registre via l'admin. La validation d'un retrait ne paie pas : un second formulaire permet de déclarer un TXID de test et de finaliser l'écriture fictive. Son rejet restitue la réservation de test. Rien ne prouve qu'un paiement a été effectué.
-
-Il faut en plus intégrer une vérification indépendante des transactions et des confirmations, un flux de paiement manuel sécurisé, KYC, double authentification, autorisations administrateur robustes et audit avant toute utilisation réelle. Ne pas activer le mode de test sur un service public.
+Configurer `DOIT_ADMIN_EMAIL` et `DOIT_ADMIN_BOOTSTRAP_PASSWORD` dans les variables d’environnement du serveur avant son premier démarrage. Le mot de passe doit compter au moins 12 caractères. Les routes d’administration exigent une session administrateur valide et un jeton CSRF.

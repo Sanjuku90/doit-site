@@ -21,7 +21,9 @@ services:
         value: "1"
       - key: PYTHONUNBUFFERED
         value: "1"
-      - key: DOIT_MANUAL_TEST
-        value: "1"
+      - key: DOIT_ADMIN_EMAIL
+        sync: false
+      - key: DOIT_ADMIN_BOOTSTRAP_PASSWORD
+        sync: false
       - key: DOIT_WITHDRAW_FEE_PERCENT
         value: "2"
