@@ -268,8 +268,14 @@ class Handler(BaseHTTPRequestHandler):
     if path.endswith('/complete'):
      changed=manual_settlement.complete_withdrawal(DB,data.get('id'),actor,data.get('reason'),data.get('txid'))
      return self.reply(200,{'changed':changed,'notice':'Paiement manuel enregistré. Le site n’a effectué aucun transfert.'})
-    state=review_queue.decide(DB,data.get('id'),data.get('decision'),actor,data.get('reason'))
-    return self.reply(200,{'state':state,'notice':'Décision administrative enregistrée.'})
+    request_id=data.get('id'); decision=data.get('decision')
+    rows=[r for r in web_queue.list_admin(DB) if r['id']==request_id]
+    state=review_queue.decide(DB,request_id,decision,actor,'TXID et montant vérifiés par l’administrateur' if decision=='approve' else 'Demande rejetée par l’administrateur')
+    if decision=='approve' and rows and rows[0]['kind']=='deposit' and rows[0].get('declared_currency') in ('USD','XOF'):
+     row=rows[0]
+     manual_settlement.credit_deposit(DB,request_id,actor,'Dépôt approuvé après vérification du TXID et du montant',row['declared_usdt'],'1','Valeur USD/XOF convertie au taux publié à la demande')
+     state='credited_test'
+    return self.reply(200,{'state':state,'notice':'Demande approuvée et solde mis à jour.' if decision=='approve' and rows and rows[0]['kind']=='deposit' and rows[0].get('declared_currency') in ('USD','XOF') else 'Décision administrative enregistrée.'})
    except (ValueError,sqlite3.IntegrityError):return self.reply(400,{'error':'Demande invalide ou déjà traitée.'})
   s=self.auth()
   if not s:return
@@ -288,7 +294,15 @@ class Handler(BaseHTTPRequestHandler):
    if not allow('manual:'+self.client_address[0]):return self.reply(429,{'error':'Trop de tentatives. Réessayez plus tard.'})
    try:
     if path=='/api/manual/deposit':
-     rid=web_queue.deposit(DB,s['id'],data.get('usd'),data.get('usdt'),data.get('txid'))
+     currency=data.get('currency')
+     if currency in ('USD','XOF'):
+      amount=data.get('amount')
+      converted=conversion(amount,currency,'USD')
+      if converted.get('stale'):raise ConnectionError('Taux de change trop ancien. Réessayez plus tard.')
+      usd=converted['result'];usdt=usd
+      rid=web_queue.deposit(DB,s['id'],usd,usdt,data.get('txid'),currency,amount)
+     else:
+      rid=web_queue.deposit(DB,s['id'],data.get('usd'),data.get('usdt'),data.get('txid'),None,None)
      return self.reply(201,{'id':rid,'state':'pending','notice':'Déclaration reçue. Le crédit nécessite une décision de l’administrateur.'})
     if path=='/api/manual/withdraw':
      rid=web_queue.withdraw(DB,s['id'],data.get('usd'),data.get('address'),WITHDRAW_FEE_PERCENT,data.get('accepted_fee_bps'),data.get('accepted_fee_cents'))
