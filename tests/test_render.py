@@ -36,4 +36,10 @@ class RenderTests(unittest.TestCase):
   text=(ROOT/'render.yaml').read_text()
   for item in ('runtime: python','mountPath: /var/data','value: /var/data/doit.sqlite3','healthCheckPath: /api/health','value: 0.0.0.0','value: "1"'):
    self.assertIn(item,text)
+ def test_render_keepalive_workflow(self):
+  workflow=(ROOT/'.github'/'workflows'/'render-keepalive.yml').read_text()
+  self.assertIn("cron: '*/10 * * * *'",workflow)
+  self.assertIn('vars.RENDER_URL',workflow)
+  self.assertIn('/api/health',workflow)
+
 if __name__=='__main__':unittest.main()

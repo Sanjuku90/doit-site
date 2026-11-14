@@ -1,0 +1,29 @@
+name: Keep Render service awake
+
+on:
+  schedule:
+    # Ping before Render's 15-minute idle timeout on free web services.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check Render health endpoint
+        env:
+          RENDER_URL: ${{ vars.RENDER_URL }}
+        run: |
+          if [ -z "$RENDER_URL" ]; then
+            echo "Repository variable RENDER_URL is missing. Set it to the base URL of the Render service."
+            exit 1
+          fi
+          RENDER_URL="${RENDER_URL%/}"
+          curl --fail --silent --show-error --max-time 25 \
+            --retry 2 --retry-delay 3 \
+            "$RENDER_URL/api/health"
+          echo
