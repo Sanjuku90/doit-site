@@ -1,4 +1,4 @@
-# DO IT — version V12 corrigée
+# DO IT — Supabase PostgreSQL
 
 Cette version reprend le projet d’origine et réactive le parcours des demandes de dépôt et de retrait. Les opérations sont **manuelles** : aucun contrôle blockchain ni aucun transfert de cryptomonnaie n’est lancé automatiquement par le site.
 
@@ -23,7 +23,7 @@ Définir les variables d’environnement **avant le premier démarrage** :
 - `DOIT_ADMIN_EMAIL` : adresse e-mail réservée au compte administrateur.
 - `DOIT_ADMIN_BOOTSTRAP_PASSWORD` : mot de passe initial long d’au moins 12 caractères. Utiliser un gestionnaire de secrets ; ne jamais le mettre dans le code ni dans un dépôt public.
 - `DOIT_WITHDRAW_FEE_PERCENT=2` : frais de retrait.
-- `DOIT_DB` : chemin vers le stockage persistant SQLite.
+- `DATABASE_URL` : URI de connexion PostgreSQL Supabase, stockée uniquement dans les variables secrètes de Render.
 - `DOIT_SECURE_COOKIE=1` en production HTTPS.
 
 Au premier démarrage, le serveur crée le compte administrateur. Connecte-toi ensuite avec ces identifiants et ouvre `/admin`. Si la base contient déjà un compte ordinaire avec l’adresse choisie, le démarrage refuse de lui accorder les privilèges : il faut choisir une adresse admin distincte.
@@ -33,10 +33,10 @@ L’ancien paramètre `DOIT_MANUAL_TEST` n’active ni ne désactive plus les de
 ## Démarrage local
 
 ```bash
-python server.py
+DOIT_TEST_SQLITE=1 DATABASE_URL=./doit-local.sqlite3 python server.py
 ```
 
-Puis ouvrir `http://127.0.0.1:8080`.
+Ce mode SQLite est réservé au développement local et aux tests ; il ne doit pas être activé en production. Puis ouvrir `http://127.0.0.1:8080`.
 
 ## Limites et précautions
 
@@ -46,4 +46,11 @@ Le compte de registre est un registre applicatif, pas une preuve de réserves ni
 
 ## Tests
 
-Exécuter `python -m unittest discover -s tests -v`. Les tests couvrent les demandes, les réservations, les frais, l’idempotence, les validations manuelles et le contrôle d’accès administrateur. Le test de conversion de devises dépend d’une source de taux externe ; il peut échouer si le réseau est indisponible et qu’aucun taux n’est en cache.
+Exécuter `python -m pip install -r requirements.txt`, puis `python -m unittest discover -s tests -v`. Les tests utilisent des fichiers SQLite temporaires isolés ; ils ne se connectent pas à la base Supabase de production. Le test de conversion de devises dépend d’une source de taux externe ; il peut échouer si le réseau est indisponible et qu’aucun taux n’est en cache.
+
+
+## Base de données Supabase (PostgreSQL)
+
+L'application utilise PostgreSQL via `DATABASE_URL`. Configurez dans Render l'URI PostgreSQL de Supabase comme variable secrète. La connexion impose TLS (`sslmode=require`).
+
+Au premier démarrage, DO IT crée les tables nécessaires dans le schéma PostgreSQL `public`. La base est initialisée vide : aucune donnée SQLite locale n'est importée. Planifiez et vérifiez toute migration de données séparément ; ne supprimez pas l'ancienne base avant validation.

@@ -1,6 +1,6 @@
 import tempfile,pathlib,sys,unittest,concurrent.futures,sqlite3
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]))
-from finance import ledger as l,review_queue as q,manual_settlement as s
+from finance import ledger as l,review_queue as q,manual_settlement as s,web_queue
 class Tests(unittest.TestCase):
  def setUp(self):self.t=tempfile.TemporaryDirectory();self.db=str(pathlib.Path(self.t.name)/'app.db');s.init(self.db)
  def tearDown(self):self.t.cleanup()
@@ -26,4 +26,12 @@ class Tests(unittest.TestCase):
   def f(i):return s.credit_deposit(self.db,'d1','admin','vérifié','10','1','test')
   with concurrent.futures.ThreadPoolExecutor(max_workers=2) as p:r=list(p.map(f,range(2)))
   self.assertEqual(sorted(r),[False,True]);self.assertEqual(l.snapshot(self.db,1)['available'],1000)
+ def test_legacy_withdrawal_without_fee_snapshot_table(self):
+  web_queue.init(self.db)
+  l.book_verified_deposit(self.db,1,5000,'deposit')
+  l.reserve_withdrawal(self.db,1,2000,'withdrawal')
+  q.submit_reserved_withdrawal(self.db,'request','withdrawal')
+  q.decide(self.db,'request','approve','admin','revue')
+  with l.open_db(self.db) as c:c.execute('DROP TABLE withdrawal_fee_snapshot')
+  self.assertTrue(s.complete_withdrawal(self.db,'request','admin','envoyé','d'*64))
 if __name__=='__main__':unittest.main()

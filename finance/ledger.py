@@ -2,10 +2,11 @@
 
 Posting keys and transaction digest make retries idempotent. All operations require
 an explicit authorized caller; never expose these functions directly to web requests.
-Each posting set is balanced and persisted under BEGIN IMMEDIATE. A signed value is
+Each posting set is balanced and persisted in a database transaction. A signed value is
 an accounting position, not evidence of cash or a customer withdrawal entitlement.
 """
-import hashlib, json, re, sqlite3
+import hashlib, json, re
+import postgres_compat as sqlite3
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_EVEN
 
@@ -19,7 +20,7 @@ def cents(value):
 
 def timestamp():return datetime.now(timezone.utc).isoformat()
 def open_db(path):
- c=sqlite3.connect(path,timeout=10,isolation_level=None);c.row_factory=sqlite3.Row;c.execute('PRAGMA foreign_keys=ON');return c
+ c=sqlite3.connect(path,timeout=10);return c
 
 def migrate(path):
  with open_db(path) as c:

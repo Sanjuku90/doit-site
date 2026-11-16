@@ -78,7 +78,7 @@ def summary(report):
 
 def rehearsal(src,dest,email):
  before=inventory(src);path=backup(src,dest)
- env={**os.environ,'DOIT_DB':str(Path(path).resolve()),'DOIT_ADMIN_EMAIL':'','DOIT_ADMIN_BOOTSTRAP_PASSWORD':'','DOIT_ADMIN_REVIEW_SECRET':'','DOIT_MANUAL_TEST':'0'}
+ env={**os.environ,'DATABASE_URL':str(Path(path).resolve()),'DOIT_TEST_SQLITE':'1','DOIT_ADMIN_EMAIL':'','DOIT_ADMIN_BOOTSTRAP_PASSWORD':'','DOIT_ADMIN_REVIEW_SECRET':'','DOIT_MANUAL_TEST':'0'}
  try:
   run=subprocess.run([sys.executable,'-c','import server; server.init()'],cwd=ROOT,env=env,text=True,capture_output=True,timeout=60)
   if run.returncode:raise RuntimeError('Initialisation sur copie échouée : '+run.stderr[-1200:])
