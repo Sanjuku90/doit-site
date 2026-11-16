@@ -4,7 +4,8 @@ class RenderTests(unittest.TestCase):
  def test_render_start_and_persistence(self):
   with tempfile.TemporaryDirectory() as d:
    sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close()
-   env={**os.environ,'DOIT_HOST':'0.0.0.0','PORT':str(port),'DOIT_DB':str(pathlib.Path(d)/'persist'/'app.sqlite3'),'DOIT_SECURE_COOKIE':'0','DOIT_ADMIN_EMAIL':''}
+   db_path=pathlib.Path(d)/'persist'/'app.sqlite3';db_path.parent.mkdir()
+   env={**os.environ,'DOIT_HOST':'0.0.0.0','PORT':str(port),'DATABASE_URL':str(db_path),'DOIT_TEST_SQLITE':'1','DOIT_SECURE_COOKIE':'0','DOIT_ADMIN_EMAIL':''}
    url='http://127.0.0.1:'+str(port)
    def request(op,path,body=None):
     data=json.dumps(body).encode() if body is not None else None
@@ -27,15 +28,17 @@ class RenderTests(unittest.TestCase):
     self.assertEqual(request(op,'/api/register',user)[0],201)
     self.assertEqual(request(op,'/api/admin')[0],403)
     self.assertEqual(request(op,'/api/dashboard')[1]['available_usd'],0)
-    self.assertTrue(pathlib.Path(env['DOIT_DB']).exists())
+    self.assertTrue(pathlib.Path(env['DATABASE_URL']).exists())
     p.terminate();p.wait(timeout=5);p=start()
     self.assertEqual(request(op,'/api/me')[1]['user']['email'],user['email'])
     self.assertEqual(request(op,'/api/dashboard')[1]['bonus_xof'],5000)
    finally:p.terminate();p.wait(timeout=5)
  def test_render_config(self):
   text=(ROOT/'render.yaml').read_text()
-  for item in ('runtime: python','mountPath: /var/data','value: /var/data/doit.sqlite3','healthCheckPath: /api/health','value: 0.0.0.0','value: "1"'):
+  for item in ('runtime: python','pip install -r requirements.txt','key: DATABASE_URL','sync: false','healthCheckPath: /api/health','value: 0.0.0.0','value: "1"'):
    self.assertIn(item,text)
+  self.assertNotIn('key: DOIT_DB',text)
+  self.assertNotIn('mountPath: /var/data',text)
  def test_render_keepalive_workflow(self):
   workflow=(ROOT/'.github'/'workflows'/'render-keepalive.yml').read_text()
   self.assertIn("cron: '*/10 * * * *'",workflow)

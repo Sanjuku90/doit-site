@@ -7,7 +7,7 @@ class InvestmentStatusTests(unittest.TestCase):
  def test_plans_and_investment_endpoint(self):
   with tempfile.TemporaryDirectory() as d:
    sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close();base='http://127.0.0.1:'+str(port)
-   env={**os.environ,'DOIT_HOST':'127.0.0.1','PORT':str(port),'DOIT_DB':d+'/test.db','DOIT_SECURE_COOKIE':'0','DOIT_ADMIN_EMAIL':'','DOIT_ADMIN_BOOTSTRAP_PASSWORD':''}
+   env={**os.environ,'DOIT_HOST':'127.0.0.1','PORT':str(port),'DATABASE_URL':d+'/test.db','DOIT_TEST_SQLITE':'1','DOIT_SECURE_COOKIE':'0','DOIT_ADMIN_EMAIL':'','DOIT_ADMIN_BOOTSTRAP_PASSWORD':''}
    p=subprocess.Popen([sys.executable,'server.py'],cwd=ROOT,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
    try:
     for _ in range(80):
@@ -29,10 +29,10 @@ class InvestmentStatusTests(unittest.TestCase):
     with op.open(base+'/api/me') as r:csrf=json.load(r)['user']['csrf']
     with op.open(base+'/api/dashboard') as r:before=json.load(r)
     rates={x:'1' for x in ['USD','EUR','XOF','GBP','NGN','GHS','CAD','CNY','JPY']};rates['XOF']='600'
-    with sqlite3.connect(env['DOIT_DB']) as c:c.execute('INSERT OR REPLACE INTO fx_cache VALUES(1,?,?,?)',(json.dumps(rates),formatdate(usegmt=True),int(time.time())))
+    with sqlite3.connect(env['DATABASE_URL']) as c:c.execute('INSERT OR REPLACE INTO fx_cache VALUES(1,?,?,?)',(json.dumps(rates),formatdate(usegmt=True),int(time.time())))
     self.assertEqual(post('/api/invest',{'plan':'Starter','usd':'50','request_key':'invest-one'},csrf)[0],400)
     with op.open(base+'/api/me') as r:uid=json.load(r)['user']['id']
-    ledger.book_verified_deposit(env['DOIT_DB'],uid,5000,'test-only')
+    ledger.book_verified_deposit(env['DATABASE_URL'],uid,5000,'test-only')
     body={'plan':'Starter','usd':'50','request_key':'invest-one'}
     code,created=post('/api/invest',body,csrf);self.assertEqual(code,201);self.assertTrue(created['created'])
     self.assertFalse(post('/api/invest',body,csrf)[1]['created'])

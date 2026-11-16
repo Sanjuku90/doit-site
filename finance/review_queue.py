@@ -4,7 +4,8 @@ Approval NEVER verifies or credits deposits, and NEVER executes withdrawals.
 Host access must be restricted to trusted operators. This module is not a production
 admin interface and does not provide authentication, KYC or blockchain verification.
 """
-import re, sqlite3
+import re
+import postgres_compat as sqlite3
 from finance import ledger
 
 HEX=re.compile(r'^[0-9a-f]{64}$')

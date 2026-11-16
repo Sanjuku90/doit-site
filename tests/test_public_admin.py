@@ -4,7 +4,7 @@ class PublicAdminTests(unittest.TestCase):
  def test_anonymous_admin_and_two_percent(self):
   with tempfile.TemporaryDirectory() as d:
    sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close();base='http://127.0.0.1:'+str(port)
-   env={**os.environ,'DOIT_HOST':'127.0.0.1','PORT':str(port),'DOIT_DB':d+'/site.db','DOIT_MANUAL_TEST':'1','DOIT_WITHDRAW_FEE_PERCENT':'2','DOIT_ADMIN_EMAIL':'admin@example.test','DOIT_ADMIN_BOOTSTRAP_PASSWORD':'admin-password-12345'}
+   env={**os.environ,'DOIT_HOST':'127.0.0.1','PORT':str(port),'DATABASE_URL':d+'/site.db','DOIT_TEST_SQLITE':'1','DOIT_MANUAL_TEST':'1','DOIT_WITHDRAW_FEE_PERCENT':'2','DOIT_ADMIN_EMAIL':'admin@example.test','DOIT_ADMIN_BOOTSTRAP_PASSWORD':'admin-password-12345'}
    p=subprocess.Popen([sys.executable,'server.py'],cwd=ROOT,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
    try:
     for _ in range(60):
