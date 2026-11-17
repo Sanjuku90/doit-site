@@ -18,6 +18,6 @@ La réserve est vide initialement. Tant qu'elle ne couvre pas les bénéfices et
 - Le processus d'échéance tourne uniquement quand le serveur est actif ; son démarrage ne garantit pas la disponibilité ni la continuité du service. Les 35 tests locaux utilisent des données et taux fictifs ; le navigateur, Render, la vraie source FX et les paiements n'ont pas été testés de bout en bout.
 - Un plan déjà commencé est conservé avec son taux et sa date. Les valeurs configurées ensuite ne sont pas rétroactives. Aucune sortie anticipée n'est implémentée.
 
-## Migration
+## Base de données
 
-Sur une base avec comptes existants, suivre MIGRATION_RENDER.md : sauvegarde, répétition sur une copie, vérification du disque et du chemin avant déploiement. Les tables additionnelles sont créées au démarrage mais une migration réelle n'a pas été testée. Une base dans `/tmp` sur Render gratuit peut disparaître lors d'un redémarrage.
+Les données sont directement dans Supabase PostgreSQL (`DATABASE_URL`) : aucune migration ni import depuis SQLite. Les tables sont créées au premier démarrage sur une base vide.

@@ -1,11 +1,13 @@
 # Déploiement Render — V12 corrigée
 
-Le fichier `render.yaml` définit le serveur Python, le disque persistant SQLite et les variables d’environnement non secrètes. Lors de la création du service, renseigner les deux secrets demandés :
+Le fichier `render.yaml` définit le serveur Python, et les variables d’environnement non secrètes. Les données sont stockées directement dans Supabase PostgreSQL : aucun disque Render ni migration. Lors de la création du service, renseigner les secrets demandés :
+
+- `DATABASE_URL` : URI PostgreSQL Supabase (pooler Session, port 5432) avec le vrai mot de passe.
 
 - `DOIT_ADMIN_EMAIL` : adresse unique du compte administrateur.
 - `DOIT_ADMIN_BOOTSTRAP_PASSWORD` : mot de passe fort, 12 caractères minimum.
 
-Conserver `DOIT_DB=/var/data/doit.sqlite3`, `DOIT_SECURE_COOKIE=1` et `DOIT_WITHDRAW_FEE_PERCENT=2`. Le serveur crée le compte administrateur au premier démarrage si les variables sont définies.
+Conserver `DOIT_SECURE_COOKIE=1` et `DOIT_WITHDRAW_FEE_PERCENT=2`. Le serveur crée le compte administrateur au premier démarrage si les variables sont définies.
 
 Après déploiement, ouvrir `/admin`, se connecter avec le compte administrateur, puis contrôler les parcours avec des données de faible valeur et des comptes autorisés. Ne jamais communiquer le mot de passe dans un chat ou l’inscrire dans le dépôt.
 
@@ -20,4 +22,4 @@ Le workflow `.github/workflows/render-keepalive.yml` appelle `https://<votre-ser
 3. Créer `RENDER_URL` avec l'URL de base du service, par exemple `https://nom-du-service.onrender.com` (sans chemin `/api/health`).
 4. Ouvrir **Actions**, activer les workflows si GitHub le demande, puis lancer **Keep Render service awake → Run workflow** pour vérifier le ping.
 
-Ce ping entrant peut réduire les mises en veille après inactivité sur une instance gratuite, mais ce contournement n'est pas une garantie ni une fonctionnalité officielle de disponibilité permanente. GitHub peut retarder les tâches planifiées et Render peut redémarrer ou suspendre un service. Pour une disponibilité continue, utiliser une instance Render payante. Le ping ne corrige pas les pertes de données liées au stockage éphémère d'une instance gratuite.
+Ce ping entrant peut réduire les mises en veille après inactivité sur une instance gratuite, mais ce contournement n'est pas une garantie ni une fonctionnalité officielle de disponibilité permanente. GitHub peut retarder les tâches planifiées et Render peut redémarrer ou suspendre un service. Pour une disponibilité continue, utiliser une instance Render payante. Les données étant dans Supabase, un redémarrage de Render n'en fait perdre aucune ; le ping appelle aussi la base, ce qui évite la pause d'un projet Supabase gratuit inactif.

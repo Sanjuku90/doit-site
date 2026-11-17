@@ -23,7 +23,7 @@ Définir les variables d’environnement **avant le premier démarrage** :
 - `DOIT_ADMIN_EMAIL` : adresse e-mail réservée au compte administrateur.
 - `DOIT_ADMIN_BOOTSTRAP_PASSWORD` : mot de passe initial long d’au moins 12 caractères. Utiliser un gestionnaire de secrets ; ne jamais le mettre dans le code ni dans un dépôt public.
 - `DOIT_WITHDRAW_FEE_PERCENT=2` : frais de retrait.
-- `DOIT_DB` : chemin vers le stockage persistant SQLite.
+- `DATABASE_URL` : URI PostgreSQL Supabase (pooler Session), secret à définir dans Render.
 - `DOIT_SECURE_COOKIE=1` en production HTTPS.
 
 Au premier démarrage, le serveur crée le compte administrateur. Connecte-toi ensuite avec ces identifiants et ouvre `/admin`. Si la base contient déjà un compte ordinaire avec l’adresse choisie, le démarrage refuse de lui accorder les privilèges : il faut choisir une adresse admin distincte.
@@ -47,3 +47,10 @@ Le compte de registre est un registre applicatif, pas une preuve de réserves ni
 ## Tests
 
 Exécuter `python -m unittest discover -s tests -v`. Les tests couvrent les demandes, les réservations, les frais, l’idempotence, les validations manuelles et le contrôle d’accès administrateur. Le test de conversion de devises dépend d’une source de taux externe ; il peut échouer si le réseau est indisponible et qu’aucun taux n’est en cache.
+
+
+## Base de données Supabase (PostgreSQL)
+
+L'application utilise PostgreSQL via `DATABASE_URL`. Configurez dans Render la chaîne URI PostgreSQL de Supabase dans les variables d'environnement (`DATABASE_URL`). Remplacez `[YOUR-PASSWORD]` par le mot de passe PostgreSQL du projet et conservez le secret uniquement dans Render. La connexion impose TLS (`sslmode=require`).
+
+Au premier démarrage, DO IT crée les tables nécessaires dans le schéma PostgreSQL `public`. La base est initialisée vide : aucune donnée SQLite locale n'est importée.

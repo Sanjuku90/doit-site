@@ -14,4 +14,4 @@ L'administration `/admin` est toujours publique et sans authentification selon l
 
 ## Déploiement et données
 
-Si une version existante contient des comptes, suivre `MIGRATION_RENDER.md` avant tout redéploiement, sauvegarder la base et ne pas recréer le disque. Ne pas déployer sur `/var/data` sans disque persistant monté : Render refuse l'écriture. En service gratuit, une base dans `/tmp` est éphémère et peut disparaître au redémarrage.
+La base est directement Supabase PostgreSQL (`DATABASE_URL`), sans disque Render ni migration depuis SQLite : une base vide est initialisée au premier démarrage.

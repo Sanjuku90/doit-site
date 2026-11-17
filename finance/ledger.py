@@ -2,10 +2,11 @@
 
 Posting keys and transaction digest make retries idempotent. All operations require
 an explicit authorized caller; never expose these functions directly to web requests.
-Each posting set is balanced and persisted under BEGIN IMMEDIATE. A signed value is
+Each posting set is balanced and persisted under a PostgreSQL advisory lock. A signed value is
 an accounting position, not evidence of cash or a customer withdrawal entitlement.
 """
-import hashlib, json, re, sqlite3
+import hashlib, json, re
+import postgres_compat as sqlite3
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_EVEN
 
@@ -19,7 +20,7 @@ def cents(value):
 
 def timestamp():return datetime.now(timezone.utc).isoformat()
 def open_db(path):
- c=sqlite3.connect(path,timeout=10,isolation_level=None);c.row_factory=sqlite3.Row;c.execute('PRAGMA foreign_keys=ON');return c
+ c=sqlite3.connect(path,timeout=10);return c
 
 def migrate(path):
  with open_db(path) as c:
@@ -71,10 +72,11 @@ def post(c,key,kind,lines):
  c.executemany('INSERT INTO fin_postings(transaction_id,account,amount) VALUES(?,?,?)',[(tid,a,n) for a,n in lines])
  return tid,True
 
+LEDGER_LOCK_KEY=727001  # verrou consultatif PostgreSQL : sérialise les écritures du registre (remplace BEGIN IMMEDIATE)
 def atomic(path,action):
  c=open_db(path)
  try:
-  c.execute('BEGIN IMMEDIATE');result=action(c);c.commit();return result
+  c.execute('SELECT pg_advisory_xact_lock(?)',(LEDGER_LOCK_KEY,));result=action(c);c.commit();return result
  except Exception:
   c.rollback();raise
  finally:c.close()

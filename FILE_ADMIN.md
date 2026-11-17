@@ -19,11 +19,12 @@ La file est une brique **locale**, non connectée au site ni à un fournisseur c
 Ces commandes ne sont accessibles qu'à une personne disposant d'un accès système à l'hébergement et à la base. L'identité enregistrée est celle du compte système. Il n'y a pas d'authentification administrateur web ni de MFA ; cet outil n'est pas une interface adaptée à la production.
 
 ```sh
-python admin_review.py --db /chemin/vers/base.sqlite3 liste
-python admin_review.py --db /chemin/vers/base.sqlite3 liste --etat pending
-python admin_review.py --db /chemin/vers/base.sqlite3 historique ID_DEMANDE
-python admin_review.py --db /chemin/vers/base.sqlite3 approuver ID_DEMANDE --motif 'Contrôlé'
-python admin_review.py --db /chemin/vers/base.sqlite3 rejeter ID_DEMANDE --motif 'Non conforme'
+# DATABASE_URL = chaîne de connexion Supabase (pooler), définie dans l'environnement
+python admin_review.py liste
+python admin_review.py liste --etat pending
+python admin_review.py historique ID_DEMANDE
+python admin_review.py approuver ID_DEMANDE --motif 'Contrôlé'
+python admin_review.py rejeter ID_DEMANDE --motif 'Non conforme'
 ```
 
 L'intégrateur doit appeler `finance.review_queue.submit_deposit(...)` ou `submit_reserved_withdrawal(...)` depuis un service de confiance pour alimenter la file ; **les utilisateurs du site actuel ne peuvent pas encore soumettre de demandes**. Le module ne protège pas les autres appels directs au registre expérimental : l'intégration future doit imposer la décision admin dans le workflow côté serveur, sans chemin de contournement. Après approbation du dépôt, une vérification indépendante TRON et le rapprochement restent obligatoires. Après approbation du retrait, KYC, autorisation, signature sécurisée et confirmation du paiement restent à construire. Ne stockez jamais de clés privées dans ce projet.

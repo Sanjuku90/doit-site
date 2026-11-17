@@ -51,13 +51,13 @@ def complete_withdrawal(path,request_id,actor,reason,txid):
    return False
   wd=c.execute('SELECT * FROM fin_withdrawals WHERE id=?',(row['withdrawal_id'],)).fetchone()
   if not wd or wd['status']!='reserved':raise ValueError('Réservation introuvable')
-  has_table=c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='withdrawal_fee_snapshot'").fetchone()
+  has_table=c.execute("SELECT to_regclass('public.withdrawal_fee_snapshot')").fetchone()[0]
   fee_info=c.execute('SELECT * FROM withdrawal_fee_snapshot WHERE request_id=?',(request_id,)).fetchone() if has_table else None
   if fee_info:
    fee,net=fee_info['fee_cents'],fee_info['net_cents']
    if fee+net!=wd['amount'] or fee<0 or net<=0:raise ValueError('Frais incohérents')
   else:
-   has_meta=c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='review_web_metadata'").fetchone()
+   has_meta=c.execute("SELECT to_regclass('public.review_web_metadata')").fetchone()[0]
    if has_meta and c.execute('SELECT 1 FROM review_web_metadata WHERE request_id=?',(request_id,)).fetchone():
     raise ValueError('Ancien retrait : frais à réconcilier manuellement')
    fee,net=0,wd['amount']

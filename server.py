@@ -2,7 +2,8 @@
 """DO IT foundation: persistent accounts, restricted test bonus and read-only finance.
 Money movement is intentionally disabled until verified integrations are implemented.
 """
-import os, sys, json, re, sqlite3, secrets, hashlib, hmac, time, threading, logging
+import os, sys, json, re, secrets, hashlib, hmac, time, threading, logging
+import postgres_compat as sqlite3
 import urllib.request
 from finance import web_queue,review_queue,ledger as finledger,manual_settlement,investments
 from decimal import Decimal, ROUND_HALF_EVEN
@@ -13,7 +14,7 @@ from urllib.parse import urlparse, parse_qs
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parent
-DB=Path(os.environ.get('DOIT_DB', str(ROOT/'data'/'doit.sqlite3')))
+DB=os.environ.get('DATABASE_URL','')
 HOST=os.environ.get('DOIT_HOST','127.0.0.1'); PORT=int(os.environ.get('PORT','8080'))
 SECURE=os.environ.get('DOIT_SECURE_COOKIE','0')=='1'
 ADMIN_EMAIL=os.environ.get('DOIT_ADMIN_EMAIL','').strip().lower()
@@ -22,7 +23,6 @@ MANUAL_OPERATIONS=True
 ADMIN_SECRET=os.environ.get('DOIT_ADMIN_REVIEW_SECRET','')
 ADMIN_PASSWORD=os.environ.get('DOIT_ADMIN_BOOTSTRAP_PASSWORD','')
 WITHDRAW_FEE_PERCENT=os.environ.get('DOIT_WITHDRAW_FEE_PERCENT','2').strip()
-DB.parent.mkdir(parents=True,exist_ok=True)
 RATE={}; RATE_LOCK=threading.Lock()
 CURRENCIES=['USD','EUR','XOF','GBP','NGN','GHS','CAD','CNY','JPY']
 FX_LOCK=threading.Lock()
@@ -31,7 +31,7 @@ FX_LAST_FAILED=False
 FX_URL='https://open.er-api.com/v6/latest/USD'
 PLANS=[{'name':'Starter','min_xof':25000,'max_xof':31000,'rate':40},{'name':'Silver','min_xof':50000,'max_xof':75000,'rate':45},{'name':'Gold','min_xof':100000,'max_xof':150000,'rate':50},{'name':'Premium','min_xof':200000,'max_xof':300000,'rate':55}]
 def db():
- c=sqlite3.connect(DB,timeout=10); c.row_factory=sqlite3.Row; c.execute('PRAGMA foreign_keys=ON'); return c
+ return sqlite3.connect(DB,timeout=10)
 def now(): return datetime.now(timezone.utc).isoformat()
 def token_hash(s): return hashlib.sha256(s.encode()).hexdigest()
 def pass_hash(password,salt=None):
@@ -179,7 +179,7 @@ class Handler(BaseHTTPRequestHandler):
    try:
     with db() as c:c.execute('SELECT COUNT(*) FROM users').fetchone()
     return self.reply(200,{'status':'ok','manual_operations':'enabled'})
-   except sqlite3.Error:
+   except (sqlite3.Error,RuntimeError):
     return self.reply(503,{'status':'database_unavailable','manual_operations':'enabled'})
   if path=='/api/plans': return self.reply(200,{'plans':PLANS,'note':'Rendements théoriques non garantis. Seuils XOF convertis en USD au taux publié lors de l’activation.'})
   if path=='/api/investments':

@@ -3,7 +3,7 @@
 import argparse, getpass, json, os, sys
 from finance import review_queue as q
 p=argparse.ArgumentParser(description='DO IT - file de validation locale, sans exécution financière')
-p.add_argument('--db',default=os.environ.get('DOIT_DB','data/doit.sqlite3'))
+p.add_argument('--db',default=os.environ.get('DATABASE_URL',''))
 sub=p.add_subparsers(dest='command',required=True)
 l=sub.add_parser('liste');l.add_argument('--etat',default=None)
 a=sub.add_parser('historique');a.add_argument('id')
