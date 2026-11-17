@@ -438,7 +438,18 @@ class Handler(BaseHTTPRequestHandler):
    return self.reply(200,{'ok':True})
   if path in ['/api/deposit','/api/withdraw']: return self.reply(503,{'error':'Service non activé : aucune transaction réelle ne peut être effectuée.'})
   return self.reply(404,{'error':'Action introuvable.'})
- def do_HEAD(self): self.send_response(405); self.end_headers()
+ def do_HEAD(self):
+  # HEAD = GET sans corps (monitoring UptimeRobot, health checks) : on garde les en-têtes, on jette le corps.
+  real=self.wfile
+  class HeadOnly:
+   def __init__(s): s.sent=False
+   def write(s,b):
+    if not s.sent: s.sent=True; return real.write(b)
+    return len(b)
+   def flush(s): real.flush()
+  self.wfile=HeadOnly()
+  try: self.do_GET()
+  finally: self.wfile=real
 def settlement_worker():
  while True:
   try:
