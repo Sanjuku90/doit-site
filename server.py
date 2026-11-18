@@ -288,7 +288,7 @@ class Handler(BaseHTTPRequestHandler):
      rows=[dict(r) for r in c.execute('SELECT kind,amount_usd_minor,amount_xof_minor,description,created_at FROM ledger WHERE user_id=? ORDER BY id DESC LIMIT 30',(s['id'],))]
      bal=finledger.snapshot(DB,s['id'])
      inv=investments.list_for_user(DB,s['id'])
-     return self.reply(200,{'available_usd':bal['available']/100,'invested_usd':bal['invested']/100,'accrued_usd':sum(x['total_accrued_cents'] for x in inv if x['status']!='settled')/100,'commissions_usd':investments.funded_commissions(DB,s['id'])/100,'bonus_xof':5000,'bonus_usd':None,'reserved_usd':bal['reserved']/100,'entries':rows,'investments':inv,'payments_enabled':False})
+     return self.reply(200,{'available_usd':bal['available']/100,'invested_usd':bal['invested']/100,'accrued_usd':sum(x['total_accrued_cents'] for x in inv if x['status']!='settled')/100,'profit_accrued_usd':sum(x['profit_accrued_cents'] for x in inv if x['status']!='settled')/100,'commissions_usd':investments.funded_commissions(DB,s['id'])/100,'bonus_xof':5000,'bonus_usd':None,'reserved_usd':bal['reserved']/100,'entries':rows,'investments':inv,'payments_enabled':False})
     members=[dict(r) for r in c.execute('''WITH RECURSIVE network(id,first_name,last_name,created_at,depth) AS (
       SELECT id,first_name,last_name,created_at,1 FROM users WHERE referred_by=?
       UNION ALL

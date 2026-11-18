@@ -63,9 +63,9 @@ def list_for_user(path,uid,at=None):
   rows=c.execute('''SELECT i.*,t.plan,t.rate_xof_per_usd,t.rate_time,t.rate_source FROM fin_investments i JOIN investment_terms t ON t.investment_id=i.id WHERE i.user_id=? ORDER BY i.starts_at DESC,i.id DESC''',(uid,)).fetchall()
   result=[]
   for r in rows:
-   days=max(0,min(30,(epoch-r['starts_at'])//86400));profit=ledger.amount_at_bps(r['amount'],r['rate_bps'])
-   capital=int((Decimal(r['amount'])*days/30).quantize(Decimal(1),rounding=ROUND_HALF_EVEN))
-   accrual=int((Decimal(profit)*days/30).quantize(Decimal(1),rounding=ROUND_HALF_EVEN))
+   elapsed=max(0,min(r['duration_seconds'],epoch-r['starts_at']));days=elapsed//86400;profit=ledger.amount_at_bps(r['amount'],r['rate_bps'])
+   capital=int((Decimal(r['amount'])*elapsed/r['duration_seconds']).quantize(Decimal(1),rounding=ROUND_HALF_EVEN))
+   accrual=int((Decimal(profit)*elapsed/r['duration_seconds']).quantize(Decimal(1),rounding=ROUND_HALF_EVEN))
    status='settled' if r['status']=='settled' else ('matured_awaiting_funding' if days>=30 else 'active')
    result.append({'id':r['id'],'plan':r['plan'],'amount_cents':r['amount'],'rate_bps':r['rate_bps'],'start':r['starts_at'],'maturity':r['starts_at']+r['duration_seconds'],'days':days,'capital_accrued_cents':capital,'profit_theoretical_cents':profit,'profit_accrued_cents':accrual,'total_accrued_cents':capital+accrual,'status':status,'rate_xof_per_usd':r['rate_xof_per_usd'],'rate_time':r['rate_time'],'rate_source':r['rate_source']})
   return result
