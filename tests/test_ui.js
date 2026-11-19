@@ -18,6 +18,11 @@ const context=vm.createContext({document:{querySelector:()=>({})},location:{path
 (async()=>{
  assert.strictEqual((source.match(/refresh\.addEventListener\('click'/g)||[]).length,1);
  assert(source.includes('if(renderId!==renderSeq)return'));
+ assert(source.includes('class="refresh-status" role="status" aria-live="polite"'));
+ assert(source.includes('if(adminList.innerHTML!==adminHtml)'));
+ assert(source.includes('if(metricsBox.innerHTML!==metricsHtml)'));
+ assert(source.includes('if(supportBox.innerHTML!==supportHtml)'));
+ assert(source.includes('if(usersBox.innerHTML===usersHtml)return'));
  assert(context.__tests.nav(true).includes('data-go="Administration"'));
  assert(!context.__tests.nav(false).includes('data-go="Administration"'));
  assert.strictEqual(context.__tests.destination({is_admin:true}),'Administration');
