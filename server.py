@@ -296,11 +296,11 @@ class Handler(BaseHTTPRequestHandler):
       SELECT u.id,u.first_name,u.last_name,u.created_at,n.depth+1 FROM users u JOIN network n ON u.referred_by=n.id WHERE n.depth<5
      ) SELECT first_name,substr(last_name,1,1) || '.' AS last_initial,created_at,depth FROM network ORDER BY depth,created_at LIMIT 1000''',(s['id'],))]
     return self.reply(200,{'code':s['referral_code'],'members':members,'truncated':len(members)==1000,'commission_rates':[15,7,5,3,2],'commission_credited_usd':investments.funded_commissions(DB,s['id'])/100})
-  if path not in ['/','/admin','/admin/','/index.html','/app.js','/style.css','/logo.png']: return self.reply(404,{'error':'Page introuvable.'})
+  if path not in ['/','/admin','/admin/','/index.html','/app.js','/style.css','/logo.png','/manifest.webmanifest','/apple-touch-icon.png','/icons/icon-192.png','/icons/icon-512.png','/icons/icon-512-maskable.png']: return self.reply(404,{'error':'Page introuvable.'})
   f=ROOT/'static'/('index.html' if path in ['/','/admin','/admin/','/index.html'] else path[1:])
   try: content=f.read_bytes()
   except OSError:return self.reply(404,{'error':'Fichier introuvable.'})
-  mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png'}[f.suffix]
+  mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.webmanifest':'application/manifest+json; charset=utf-8'}[f.suffix]
   self.send_response(200); self.headers_common(); self.send_header('Content-Type',mime); self.send_header('Content-Length',str(len(content))); self.send_header('Cache-Control','no-cache'); self.end_headers(); self.wfile.write(content)
  def do_POST(self):
   path=urlparse(self.path).path
