@@ -283,7 +283,8 @@ class Handler(BaseHTTPRequestHandler):
    s=self.auth()
    if not s:return
    with db() as c:
-    if path=='/api/me': return self.reply(200,{'user':dict(s)})
+    if path=='/api/me':
+     user=dict(s);user['is_admin']=is_admin(s);return self.reply(200,{'user':user})
     if path=='/api/dashboard':
      rows=[dict(r) for r in c.execute('SELECT kind,amount_usd_minor,amount_xof_minor,description,created_at FROM ledger WHERE user_id=? ORDER BY id DESC LIMIT 30',(s['id'],))]
      bal=finledger.snapshot(DB,s['id'])

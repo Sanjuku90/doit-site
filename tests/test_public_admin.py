@@ -25,9 +25,11 @@ class PublicAdminTests(unittest.TestCase):
     post('/api/register',{'first_name':'Awa','last_name':'Test','phone':'1234567','email':'sample@example.test','password':'test-password-123'})
     adminop=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
     post('/api/login',{'email':'admin@example.test','password':'admin-password-12345'},opener=adminop)
-    with adminop.open(base+'/api/me') as r:csrf=json.load(r)['user']['csrf']
+    with adminop.open(base+'/api/me') as r:admin_me=json.load(r)['user'];csrf=admin_me['csrf']
+    self.assertTrue(admin_me['is_admin'])
     userop=op
-    with userop.open(base+'/api/me') as r:usercsrf=json.load(r)['user']['csrf']
+    with userop.open(base+'/api/me') as r:user_me=json.load(r)['user'];usercsrf=user_me['csrf']
+    self.assertFalse(user_me['is_admin'])
     reqid=post('/api/manual/deposit',{'usd':'100','usdt':'100','txid':'f'*64},usercsrf,opener=userop)['id']
     result=post('/api/manual/admin/list',{},csrf,opener=adminop)
     self.assertEqual(result['requests'][0]['id'],reqid)
