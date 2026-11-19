@@ -16,6 +16,8 @@ globalThis.__tests={
 };`;
 const context=vm.createContext({document:{querySelector:()=>({})},location:{pathname:'/'},Intl,URL,URLSearchParams,console});vm.runInContext(source+test,context);
 (async()=>{
+ assert.strictEqual((source.match(/refresh\.addEventListener\('click'/g)||[]).length,1);
+ assert(source.includes('if(renderId!==renderSeq)return'));
  assert(context.__tests.nav(true).includes('data-go="Administration"'));
  assert(!context.__tests.nav(false).includes('data-go="Administration"'));
  assert.strictEqual(context.__tests.destination({is_admin:true}),'Administration');
